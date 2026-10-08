@@ -1,0 +1,27 @@
+{
+  "name": "avs",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/nveselov-dev/temp#readme",
+  "bugs": {
+    "url": "https://github.com/nveselov-dev/temp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nveselov-dev/temp.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node ./tests/kdoc-adapter.test.js"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2"
+  }
+}

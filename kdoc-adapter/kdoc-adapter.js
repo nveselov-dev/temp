@@ -1,68 +1,47 @@
-const cheerio = require("cheerio");
+/**
+ * @module kdoc-adapter
+ * @description Конвертирует HTML в JSON-документ особого вида.
+ * Оптимизированная версия без cheerio (O(N) сложность)
+ */
 
-const getParagraph = require("./kdoc-utils/text-utils/get-paragraph");
-const getStyles = require("./kdoc-utils/get-styles");
-const getTables = require("./kdoc-utils/get-tables");
+const getStyles = require('./kdoc-utils/get-styles'); // Твой существующий модуль
+const tokenizeHtml = require('./kdoc-utils/html-tokenizer');
+const parseParagraph = require('./kdoc-utils/paragraph-parser');
+const parseTable = require('./kdoc-utils/table-parser');
 
 /**
- * Конвертирует html-строку в объект особо вида для дальнейшей обработки.
- *
- * Функция принимает html-строку и возвращает объект с данными о содержимом документа
- * и css-стилях содержимого
- *
- * @param {string} html исходня html-строка
- * @return {object} Результат: объект с информацией о содержимом документа и о css-стилях
+ * Конвертирует html-строку в объект особого вида
+ * @param {string} html - Исходная html-строка
+ * @returns {Promise<object>} Результат: { objects, styles }
  */
 module.exports = async (html) => {
-  // читаем стили
-  const stylesData = getStyles(html);
+  try {
+    // 1. Читаем стили
+    const stylesData = getStyles(html);
 
-  const $ = cheerio.load(html);
+    // 2. Токенизируем HTML (быстро, без cheerio)
+    const blocks = tokenizeHtml(html);
+    const objects = [];
 
-  const paragraphs = $("p");
-  const tables = $("table");
-
-  const objects = [];
-
-  paragraphs.each((_index, element) => {
-    const $element = $(element);
-    const PObject = getParagraph($, $element, stylesData);
-
-    objects.push(PObject);
-  });
-
-  const tablesArray = getTables(tables, $, stylesData);
-
-  const resultArray = [];
-
-  for (let i = 0; i < objects.length; i++) {
-    const object = objects[i];
-    const table = tablesArray.find((table) => table.firstPid == object.pid);
-
-    if (table) {
-      if (!table.firstPid || !table.lastPid) continue;
-
-      if (table.type == "TABLE") {
-        resultArray.push(table);
-      } else if (table.type == "ROWS") {
-        table.rows.forEach((row) => {
-          resultArray.push(row);
-        });
-      } else if (table.type == "OBJECTS") {
-        table.objects.forEach((object) => {
-          resultArray.push(object);
-        });
+    // 3. Последовательно парсим каждый блок
+    for (const block of blocks) {
+      try {
+        if (block.type === 'p') {
+          objects.push(parseParagraph(block.source, stylesData));
+        } else if (block.type === 'table') {
+          // Таблица может разбиться на несколько объектов
+          const tableObjects = parseTable(block.source, stylesData);
+          objects.push(...tableObjects);
+        }
+      } catch (err) {
+        console.error('[WARN] Ошибка парсинга блока:', err.message);
+        // Не падаем, продолжаем обработку
       }
-
-      const firstIdx = table.cells.indexOf(
-        table.cells.find((cell) => cell.pid == table.firstPid)
-      );
-
-      i += table.cells.length - 1 - firstIdx;
-    } else {
-      resultArray.push(object);
     }
-  }
 
-  return { objects: resultArray, styles: stylesData };
+    return { objects, styles: stylesData };
+  } catch (error) {
+    console.error('[FATAL] Критическая ошибка:', error);
+    return { objects: [], styles: {} };
+  }
 };
